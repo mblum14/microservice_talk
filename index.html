@@ -15,7 +15,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
 
 		<link rel="stylesheet" href="css/reveal.css">
-		<link rel="stylesheet" href="css/theme/black.css" id="theme">
+		<link rel="stylesheet" href="css/theme/lcars.css" id="theme">
 
 		<!-- Code syntax highlighting -->
 		<link rel="stylesheet" href="lib/css/zenburn.css">
@@ -40,34 +40,393 @@
 
 			<!-- Any section element inside of this container is displayed as a slide -->
 			<div class="slides">
+        <!-- BEGIN Intro -->
 				<section>
-					<h1>Reveal.js</h1>
-					<h3>The HTML Presentation Framework</h3>
+					<h1>Turn ALL The Things Into Microservices!</h1>
 					<p>
-						<small>Created by <a href="http://hakim.se">Hakim El Hattab</a> / <a href="http://twitter.com/hakimel">@hakimel</a></small>
+            <small>Created by Michael Blumberg</small>
 					</p>
 				</section>
+        <!-- END Intro -->
 
-				<section>
-					<h2>Pretty Code</h2>
-					<pre><code data-trim contenteditable>
-function linkify( selector ) {
-  if( supports3DTransforms ) {
+        <!-- BEGIN Expanding Controller Example-->
+        <section>
+  				<section>
+  					<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.create(params[:comment])
+    respond_with @comment, status: 201
+  end
+end
+  					</code></pre>
+  				</section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.create(params[:comment])
+    if @comment.valid?
+      status = 201
+    else
+      status = 422
+    end
+    respond_with @comment, status: status
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Add validation
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if @comment.document.participants.include?(current_user)
+      if @comment.save?
+        status = 201
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Make sure current use is a participant on the document?
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if @comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user
+      if @comment.save?
+        status = 201
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Make sure current user could be author too
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if @comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user ||
+      current_user.is_admin?
+      if @comment.save?
+        status = 201
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              or allow admins to comment
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if @comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user ||
+      current_user.is_admin?
+      if @comment.save?
+        status = 201
+        DocumentActivityMailer.comment_left(@comment).deliver
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Notify the author that somebody left a comment
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if @comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user ||
+      current_user.is_admin?
+      if @comment.save?
+        status = 201
+        DocumentActivityMailer.comment_left(@comment).deliver
+        if @comment.is_response_to_another_comment?
+          DocumentActivityMailer.response_left(@comment.parent).deliver
+        end
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Notify the commentor if somebody responded to their comment
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if @comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user ||
+      current_user.is_admin?
+      if @comment.save?
+        status = 201
+        DocumentActivityMailer.comment_left(@comment).deliver
+        if @comment.is_response_to_another_comment? &&
+           @comment.parent.author_elected_to_receive_notifications?
+          DocumentActivityMailer.response_left(@comment.parent).deliver
+        end
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Notify the commentor if somebody responded to their comment only if they elected to
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if (@comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user ||
+      current_user.is_admin?) &&
+      @comment.document.comments_enabled?
+      if @comment.save?
+        status = 201
+        DocumentActivityMailer.comment_left(@comment).deliver
+        if @comment.is_response_to_another_comment? &&
+           @comment.parent.author_elected_to_receive_notifications?
+          DocumentActivityMailer.response_left(@comment.parent).deliver
+        end
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              Notify the commentor if somebody responded to their comment only if they elected to
+            </aside>
+				  </section>
+				  <section>
+				  	<pre class="stretch"><code class="ruby" data-trim contenteditable>
+class CommentsController < ApplicationController
+  respond_to :json
+  def create
+    @comment = Comment.new(params[:comment])
+    if (@comment.document.participants.include?(current_user) ||
+      @comment.document.author == current_user ||
+      current_user.is_admin?) &&
+      @comment.document.comments_enabled? &&
+      !Time.now.wednesday?
+      if @comment.save?
+        status = 201
+        DocumentActivityMailer.comment_left(@comment).deliver
+        if @comment.is_response_to_another_comment? &&
+           @comment.parent.author_elected_to_receive_notifications?
+          DocumentActivityMailer.response_left(@comment.parent).deliver
+        end
+      else
+        status = 422
+      end
+      respond_with @comment, status: status
+    else
+      respond_with {}, status: 403
+    end
+  end
+end
+				  	</code></pre>
+            <aside class="notes">
+              No comments on hump day
+            </aside>
+				  </section>
+  			</section>
+        <!-- END Expanding Controller Example-->
 
-    var nodes = document.querySelectorAll( selector );
+        <!-- BEGIN Quote 1 -->
+        <section>
+          <blockquote>
+            <p>
+            "Extract 'til you just can't extract anymore. Extract 'til you drop."
+            </p>
+            <footer>Bob Martin</footer>
+          </blockquote>
+          <aside class="notes">
+            What uncle Bob is also saying here, is that a class/function should do one thing.
+            But how does this apply to a service oriented architecture? &lt;transition&gt;
+          </aside>
+        </section>
+        <!-- END Quote 1 -->
+        <!-- BEGIN Expanding Controllers Directory Example -->
+        <section>
+          <pre class="stretch">
+<span class="text-5"># ~/my_project/app/controllers</span>
+<span class="text-8">$</span> ls -1R
+application_controller.rb
+dashboard_controller.rb
+documents_controller.rb
+users_controller.rb
+<span class="text-8">$</span>
 
-    for( var i = 0, len = nodes.length; i &lt; len; i++ ) {
-      var node = nodes[i];
+          </pre>
+          <aside class="notes">
+            "Just like your rails controller, your perfect app..."
+          </aside>
+        </section>
+        <section>
+          <pre class="stretch">
+<span class="text-5"># ~/my_project/app/controllers</span>
+<span class="text-8">$</span> ls -1R | less
+administration/
+api/
+application_controller.rb
+annotations_controller.rb
+comments_controller.rb
+dashboard_controller.rb
+difference_calculator_controller.rb
+documents_controller.rb
+faqs_controller.rb
+groups_controller.rb
+history_controller.rb
+participants_controller.rb
+preferences_controller.rb
+search_controller.rb
+theme_controller.rb
+timeline_controller.rb
+users_controller.rb
+votes_controller.rb
 
-      if( !node.className ) {
-        node.className += ' roll';
-      }
-    }
-  }
-}
-					</code></pre>
-					<p>Code syntax highlighting courtesy of <a href="http://softwaremaniacs.org/soft/highlight/en/description/">highlight.js</a>.</p>
-				</section>
+./administration:
+delayed_jobs_controller.rb
+emails_controller.rb
+faqs_controller.rb
+metrics_controller.rb
+...
+          </pre>
+          <aside class="notes">
+            "If you 'ls -l | less' you app/controllers directory and you see this you might have a hidden application"
+          </aside>
+        </section>
+        <!-- END Expanding Controllers Directory Example -->
+        <!-- BEGIN Architecture Diagrams -->
+        <section>
+          <img data-src="lib/images/monolith.png">
+        </section>
+        <section>
+          <section>
+            <pre class="stretch">
+<span class="text-5"># ~/my_project/app/controllers</span>
+<span class="text-8">$</span> ls -1R | less
+administration/
+api/
+application_controller.rb
+<span class="fragment highlight-red" data-fragment-index="1">annotations_controller.rb</span><span class="fragment text-6" data-fragment-index="1" > &#10094;&#10094;</span>
+comments_controller.rb
+dashboard_controller.rb
+<span class="fragment highlight-red" data-fragment-index="1">difference_calculator_controller.rb</span><span class="fragment text-6" data-fragment-index="1" > &#10094;&#10094;</span>
+documents_controller.rb
+<span class="fragment highlight-red" data-fragment-index="1">faqs_controller.rb</span><span class="fragment text-6" data-fragment-index="1" > &#10094;&#10094;</span>
+groups_controller.rb
+history_controller.rb
+participants_controller.rb
+preferences_controller.rb
+search_controller.rb
+theme_controller.rb
+timeline_controller.rb
+users_controller.rb
+votes_controller.rb
+
+./administration:
+delayed_jobs_controller.rb
+<span class="fragment highlight-red" data-fragment-index="1">emails_controller.rb</span><span class="fragment text-6" data-fragment-index="1" > &#10094;&#10094;</span>
+faqs_controller.rb
+metrics_controller.rb
+...
+            </pre>
+            <aside class="notes">
+              "If you 'ls -l | less' you app/controllers directory and you see this you might have a hidden application"
+            </aside>
+          </section>
+        </section>
+        <section>
+          <img data-src="lib/images/web_services.png">
+        </section>
+        <!-- END Architecture Diagrams -->
+        <!-- BEGIN Benefits -->
+        <section>
+          <ul>
+            <li class="">Language/Framework Agnostic</li>
+            <li class="fragment fade-in">Share Code Across Apps</li>
+            <li class="fragment fade-in">Reduce Outages</li>
+          </ul>
+        </section>
+        <!-- END Benefits -->
+        <!-- BEGIN Roadblocks -->
+        <section>
+          <img class="strecth" data-src="lib/images/meme.jpg">
+        </section>
+        <!-- END Roadblocks -->
 			</div>
 		</div>
 		<script src="lib/js/head.min.js"></script>
